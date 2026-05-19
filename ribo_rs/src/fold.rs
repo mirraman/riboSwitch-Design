@@ -84,6 +84,8 @@ fn fill_v(seq: &[u8], v: &[i64], wm: &[i64], i: usize, j: usize, n: usize) -> i6
     if j - i - 1 >= 2 * (MIN_HAIRPIN + 2) {
         let mut ml_base = (ML_OFFSET + ML_PER_BRANCH) as i64;
         if is_au_gu(pi) { ml_base += TERMINAL_AU_PENALTY as i64; }
+        ml_base += DANGLE3[pi][seq[i + 1] as usize] as i64;
+        ml_base += DANGLE5[pi][seq[j - 1] as usize] as i64;
         for k in (i + 2 + MIN_HAIRPIN)..(j - MIN_HAIRPIN - 1) {
             let wml = wm[(i + 1) * n + k];
             let wmr = wm[(k + 1) * n + j - 1];
@@ -97,13 +99,29 @@ fn fill_v(seq: &[u8], v: &[i64], wm: &[i64], i: usize, j: usize, n: usize) -> i6
 }
 fn fill_wm(seq: &[u8], v: &[i64], wm: &[i64], i: usize, j: usize, n: usize) -> i64 {
     let mut best = INF64;
-    if can_pair(seq, i, j) {
-        let vi = v[i * n + j];
-        if vi < INF64 {
-            let pi = pair_index(seq[i], seq[j]).unwrap();
-            let mut e = vi + ML_PER_BRANCH as i64;
-            if is_au_gu(pi) { e += TERMINAL_AU_PENALTY as i64; }
-            if e < best { best = e; }
+    // Evaluate single stem with optional dangles
+    // Stem can be at (p, q) where p is i or i+1, and q is j or j-1
+    for p in i..=i+1 {
+        for q in (j.saturating_sub(1)..=j).rev() {
+            if p >= q || q - p < MIN_HAIRPIN + 1 { continue; }
+            if can_pair(seq, p, q) {
+                let vpq = v[p * n + q];
+                if vpq < INF64 {
+                    let pi = pair_index(seq[p], seq[q]).unwrap();
+                    let mut e = vpq + ML_PER_BRANCH as i64;
+                    if is_au_gu(pi) { e += TERMINAL_AU_PENALTY as i64; }
+                    
+                    // Add dangle 5' if p == i + 1
+                    if p == i + 1 { e += DANGLE5[pi][seq[i] as usize] as i64; }
+                    // Add dangle 3' if q == j - 1
+                    if q == j - 1 { e += DANGLE3[pi][seq[j] as usize] as i64; }
+                    
+                    // Add unpaired penalties for the dangles
+                    e += ((p - i) as i64 + (j - q) as i64) * ML_PER_UNPAIRED as i64;
+                    
+                    if e < best { best = e; }
+                }
+            }
         }
     }
     if i + 1 <= j {
@@ -204,6 +222,8 @@ fn trace_v(
     if j - i - 1 >= 2 * (MIN_HAIRPIN + 2) {
         let mut ml_base = (ML_OFFSET + ML_PER_BRANCH) as i64;
         if is_au_gu(pi) { ml_base += TERMINAL_AU_PENALTY as i64; }
+        ml_base += DANGLE3[pi][seq[i + 1] as usize] as i64;
+        ml_base += DANGLE5[pi][seq[j - 1] as usize] as i64;
         for k in (i + 2 + MIN_HAIRPIN)..(j - MIN_HAIRPIN - 1) {
             let wml = wm[(i + 1) * n + k];
             let wmr = wm[(k + 1) * n + j - 1];
@@ -223,17 +243,27 @@ fn trace_wm(
     if i > j { return; }
     let target = wm[i * n + j];
     if target >= INF64 { return; }
-    if can_pair(seq, i, j) {
-        let vi = v[i * n + j];
-        if vi < INF64 {
-            let pi = pair_index(seq[i], seq[j]).unwrap();
-            let mut e = vi + ML_PER_BRANCH as i64;
-            if is_au_gu(pi) { e += TERMINAL_AU_PENALTY as i64; }
-            if e == target {
-                pairs[i] = j as i32;
-                pairs[j] = i as i32;
-                trace_v(seq, v, wm, i, j, n, pairs);
-                return;
+    for p in i..=i+1 {
+        for q in (j.saturating_sub(1)..=j).rev() {
+            if p >= q || q - p < MIN_HAIRPIN + 1 { continue; }
+            if can_pair(seq, p, q) {
+                let vpq = v[p * n + q];
+                if vpq < INF64 {
+                    let pi = pair_index(seq[p], seq[q]).unwrap();
+                    let mut e = vpq + ML_PER_BRANCH as i64;
+                    if is_au_gu(pi) { e += TERMINAL_AU_PENALTY as i64; }
+                    
+                    if p == i + 1 { e += DANGLE5[pi][seq[i] as usize] as i64; }
+                    if q == j - 1 { e += DANGLE3[pi][seq[j] as usize] as i64; }
+                    e += ((p - i) as i64 + (j - q) as i64) * ML_PER_UNPAIRED as i64;
+                    
+                    if e == target {
+                        pairs[p] = q as i32;
+                        pairs[q] = p as i32;
+                        trace_v(seq, v, wm, p, q, n, pairs);
+                        return;
+                    }
+                }
             }
         }
     }
@@ -327,6 +357,28 @@ fn interior64(
         let mm5 = seq[i + 1] as usize;
         let mm3 = seq[j - 1] as usize;
         let val = INT11[pi][pp][mm5][mm3];
+        if val < INF { return val as i64; }
+    }
+    if nl == 1 && nr == 2 {
+        let mm5 = seq[i + 1] as usize;
+        let mm3 = seq[j - 1] as usize;
+        let mm_mid = seq[j - 2] as usize;
+        let val = INT21[pi][pp][mm5][mm3][mm_mid];
+        if val < INF { return val as i64; }
+    }
+    if nl == 2 && nr == 1 {
+        let mm5 = seq[i + 1] as usize;
+        let mm3 = seq[j - 1] as usize;
+        let mm_mid = seq[i + 2] as usize;
+        let val = INT12[pi][pp][mm5][mm3][mm_mid];
+        if val < INF { return val as i64; }
+    }
+    if nl == 2 && nr == 2 {
+        let m5o = seq[i + 1] as usize;
+        let m3o = seq[j - 1] as usize;
+        let m5i = seq[i + 2] as usize;
+        let m3i = seq[j - 2] as usize;
+        let val = INT22[pi][pp][m5o][m3o][m5i][m3i];
         if val < INF { return val as i64; }
     }
     let mut e = if total <= 30 { INTERIOR_INIT[total] } else {

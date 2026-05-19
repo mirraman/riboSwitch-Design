@@ -1,7 +1,7 @@
 pub const INF: i32 = 10_000_000;
 pub const MIN_HAIRPIN: usize = 3;
-pub const ML_OFFSET: i32 = 340;
-pub const ML_PER_BRANCH: i32 = 40;
+pub const ML_OFFSET: i32 = 930;
+pub const ML_PER_BRANCH: i32 = -90;
 pub const ML_PER_UNPAIRED: i32 = 0;
 pub const TERMINAL_AU_PENALTY: i32 = 50;
 pub const NINIO_MAX: i32 = 300;
@@ -49,7 +49,54 @@ pub const HAIRPIN_MM: [[[i32; 4]; 4]; 6] = [
     [[-30,-100,-80,-100], [-60,-70,-60,-70], [-60,-100,-80,-100], [-60,-80,-60,-60]],
     [[-100,-80,-110,-80], [-70,-60,-70,-50], [-50,-80,-80,-80], [-70,-60,-70,-50]],
 ];
-pub use HAIRPIN_MM as INTERIOR_MM;
+// INTERIOR_MM: Mismatch energies for interior loops (Turner 2004)
+// Indexing: [pair_type][5'_mismatch][3'_mismatch]
+// Pairs: AU=0, UA=1, CG=2, GC=3, GU=4, UG=5
+// Bases: A=0, C=1, G=2, U=3
+pub const INTERIOR_MM: [[[i32; 4]; 4]; 6] = [
+    // AU pair (index 0)
+    [
+        [  0,   0,   0,   0],  // A at 5'
+        [  0,   0,   0,   0],  // C at 5'
+        [-50, -50, -50, -50],  // G at 5'
+        [  0,   0,   0,   0],  // U at 5'
+    ],
+    // UA pair (index 1)
+    [
+        [  0,   0, -50,   0],  // A at 5'
+        [  0,   0,   0,   0],  // C at 5'
+        [  0,   0, -50,   0],  // G at 5'
+        [  0,   0,   0,   0],  // U at 5'
+    ],
+    // CG pair (index 2)
+    [
+        [  0,   0, -110,   0],  // A at 5'
+        [  0,   0,    0,   0],  // C at 5'
+        [-110,  0, -110,   0],  // G at 5'
+        [  0,   0,    0,   0],  // U at 5'
+    ],
+    // GC pair (index 3)
+    [
+        [  0,   0,   0, -110],  // A at 5'
+        [  0,   0,   0,    0],  // C at 5'
+        [  0,   0, -110,   0],  // G at 5'
+        [-110,  0,    0,   0],  // U at 5'
+    ],
+    // GU pair (index 4)
+    [
+        [  0,   0,   0,   0],  // A at 5'
+        [  0,   0,   0,   0],  // C at 5'
+        [-50, -50, -50, -50],  // G at 5'
+        [  0,   0,   0,   0],  // U at 5'
+    ],
+    // UG pair (index 5)
+    [
+        [  0,   0, -50,   0],  // A at 5'
+        [  0,   0,   0,   0],  // C at 5'
+        [  0,   0, -50,   0],  // G at 5'
+        [  0,   0,   0,   0],  // U at 5'
+    ],
+];
 pub use crate::params_int::*;
 pub const DANGLE5: [[i32; 4]; 6] = [
     [-30, -10, -20, -20],

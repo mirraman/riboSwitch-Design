@@ -211,14 +211,57 @@ fn multiloop_energy(
         prev = q;
     }
     n_unpaired += (j - prev - 1) as i32;
+    
+    // Energia de bază multi-loop
     let mut energy = ML_OFFSET + ML_PER_BRANCH * nb + ML_PER_UNPAIRED * n_unpaired;
+    
+    // Penalizare AU/GU pentru perechea de închidere
     let ci = match pair_index(seq[i], seq[j]) { Some(x) => x, None => return INF };
-    if is_au_gu(ci) { energy += TERMINAL_AU_PENALTY; }
-    for &(p, q) in children {
-        if let Some(bi) = pair_index(seq[p], seq[q]) {
-            if is_au_gu(bi) { energy += TERMINAL_AU_PENALTY; }
+    if is_au_gu(ci) { 
+        energy += TERMINAL_AU_PENALTY; 
+    }
+    
+    // ========================================================================
+    // DANGLES pentru perechea de închidere (looking INTO the multiloop)
+    // ========================================================================
+    // Dangle 3' de la perechea de închidere (nucleotida i+1)
+    if i + 1 < j {
+        energy += DANGLE3[ci][seq[i + 1] as usize];
+    }
+    
+    // Dangle 5' de la perechea de închidere (nucleotida j-1)
+    if j > i + 1 {
+        energy += DANGLE5[ci][seq[j - 1] as usize];
+    }
+    
+    // ========================================================================
+    // Procesare ramuri (children)
+    // ========================================================================
+    for (idx, &(p, q)) in children.iter().enumerate() {
+        let bi = match pair_index(seq[p], seq[q]) { Some(x) => x, None => continue };
+        
+        // Penalizare AU/GU pentru această ramură
+        if is_au_gu(bi) { 
+            energy += TERMINAL_AU_PENALTY; 
+        }
+        
+        // ====================================================================
+        // DANGLES pentru această ramură
+        // ====================================================================
+        
+        // Dangle 5' (nucleotida ÎNAINTE de p)
+        if p > i + 1 {
+            energy += DANGLE5[bi][seq[p - 1] as usize];
+        }
+        
+        // Dangle 3' (nucleotida DUPĂ q)
+        if q + 1 < j {
+            if q + 1 < seq.len() {
+                energy += DANGLE3[bi][seq[q + 1] as usize];
+            }
         }
     }
+    
     energy
 }
 fn external_energy(
