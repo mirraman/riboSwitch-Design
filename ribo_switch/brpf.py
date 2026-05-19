@@ -3,7 +3,7 @@ import math
 from dataclasses import dataclass
 from ribo_switch.types import Base, Sequence, Structure, CANONICAL_PAIRS
 from ribo_switch.graph import Component, ConstraintGraph
-from ribo_switch.energy import eval_energy
+from ribo_switch.rust_bridge import eval_energy
 from ribo_switch.turner import TurnerParams
 _ALL_BASES = [Base.A, Base.C, Base.G, Base.U]
 

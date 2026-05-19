@@ -60,7 +60,7 @@ def hairpin_energy(seq: Sequence, closing: tuple[int, int], params: TurnerParams
         loop_seq = ''.join((seq.bases[k].name for k in range(i, j + 1)))
         bonus = params.hairpin_tetraloop.get(loop_seq, 0)
         if bonus:
-            energy = bonus
+            return bonus
     b5 = seq.bases[i + 1].value
     b3 = seq.bases[j - 1].value
     energy += int(params.hairpin_mismatch[pair_idx][b5][b3])

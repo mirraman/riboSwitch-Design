@@ -89,7 +89,7 @@ def _seq_from_str(seq_str: str) -> Sequence:
 
 def verify_sequence(seq_str: str, target_db: str, params: Optional[TurnerParams]=None, label: str='ON') -> VerificationReport:
     from ribo_switch.rust_bridge import fold_mfe as _fold_mfe
-    from ribo_switch.energy import eval_energy as _eval_energy
+    from ribo_switch.rust_bridge import eval_energy as _eval_energy
     if params is None:
         params = TurnerParams.turner2004()
     seq = _seq_from_str(seq_str)
@@ -109,7 +109,7 @@ def verify_sequence(seq_str: str, target_db: str, params: Optional[TurnerParams]
 
 def verify_against_both(seq_str: str, s_on_db: str, s_off_db: str, params: Optional[TurnerParams]=None) -> tuple[VerificationReport, VerificationReport]:
     from ribo_switch.rust_bridge import fold_mfe as _fold_mfe
-    from ribo_switch.energy import eval_energy as _eval_energy
+    from ribo_switch.rust_bridge import eval_energy as _eval_energy
     if params is None:
         params = TurnerParams.turner2004()
     seq = _seq_from_str(seq_str)

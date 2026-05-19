@@ -290,7 +290,7 @@ fn hairpin_e(seq: &[u8], i: usize, j: usize, pi: usize) -> i32 {
     if size == 4 {
         let w = &seq[i..=j];
         let bonus = tetraloop_bonus(w);
-        if bonus != 0 { energy = bonus; }
+        if bonus != 0 { return bonus; }
     }
     let b5 = seq[i + 1] as usize;
     let b3 = seq[j - 1] as usize;
