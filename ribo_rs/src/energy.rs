@@ -149,6 +149,34 @@ fn interior_energy(
             return val;
         }
     }
+    if nl == 1 && nr == 2 {
+        let mm5 = seq[i + 1] as usize;
+        let mm3 = seq[j - 1] as usize;
+        let mm_mid = seq[j - 2] as usize;
+        let val = INT21[oi][ii][mm5][mm3][mm_mid];
+        if val < INF {
+            return val;
+        }
+    }
+    if nl == 2 && nr == 1 {
+        let mm5 = seq[i + 1] as usize;
+        let mm3 = seq[j - 1] as usize;
+        let mm_mid = seq[i + 2] as usize;
+        let val = INT12[oi][ii][mm5][mm3][mm_mid];
+        if val < INF {
+            return val;
+        }
+    }
+    if nl == 2 && nr == 2 {
+        let m5o = seq[i + 1] as usize;
+        let m3o = seq[j - 1] as usize;
+        let m5i = seq[i + 2] as usize;
+        let m3i = seq[j - 2] as usize;
+        let val = INT22[oi][ii][m5o][m3o][m5i][m3i];
+        if val < INF {
+            return val;
+        }
+    }
     let mut energy = if total <= 30 {
         INTERIOR_INIT[total]
     } else {

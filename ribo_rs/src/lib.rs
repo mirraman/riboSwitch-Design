@@ -1,3 +1,4 @@
+pub mod params_int;
 pub mod params;
 pub mod energy;
 pub mod fold;
