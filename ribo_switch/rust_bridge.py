@@ -1,21 +1,23 @@
-"""Thin bridge to the ribo_rs Rust extension.
+"""Thin type-conversion bridge to the ribo_rs Rust extension.
 
 ribo_rs is a required dependency — no Python fallback.
+This module is used by nsga2.py and scorer.py which pass high-level
+Sequence/Structure objects.  For direct ribo_rs access, import ribo_rs
+directly (see brpf.py, verify.py).
 """
 from __future__ import annotations
 from typing import Iterable
 
 import numpy as _np
-
 import ribo_rs as _ribo_rs
+
 from ribo_switch.types import Sequence, Energy, Structure
 from ribo_switch.turner import TurnerParams
 from ribo_switch.fold import FoldResult
 
-USING_RUST: bool = True
-
 
 def _seq_bytes(seq: Sequence) -> list[int]:
+    """Convert a Sequence to the raw byte list that ribo_rs expects."""
     return [int(b) for b in seq.bases]
 
 

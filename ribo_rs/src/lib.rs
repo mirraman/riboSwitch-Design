@@ -1,7 +1,7 @@
-mod params;
-mod energy;
-mod fold;
-mod eval_combined;
+pub mod params;
+pub mod energy;
+pub mod fold;
+pub mod eval_combined;
 use pyo3::prelude::*;
 #[pyfunction]
 fn eval_energy(seq: Vec<u8>, pair_table: Vec<i32>) -> PyResult<i32> {

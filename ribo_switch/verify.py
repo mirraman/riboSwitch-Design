@@ -87,17 +87,22 @@ def _seq_from_str(seq_str: str) -> Sequence:
     bases = [_map[ch.upper()] for ch in seq_str]
     return Sequence(bases=bases)
 
+def _seq_bytes(seq: Sequence) -> list[int]:
+    """Convert a Sequence to the raw byte list that ribo_rs expects."""
+    return [int(b) for b in seq.bases]
+
 def verify_sequence(seq_str: str, target_db: str, params: Optional[TurnerParams]=None, label: str='ON') -> VerificationReport:
-    from ribo_switch.rust_bridge import fold_mfe as _fold_mfe
-    from ribo_switch.rust_bridge import eval_energy as _eval_energy
+    from ribo_rs import eval_energy as _eval_energy
+    from ribo_rs import fold_mfe as _fold_mfe
     if params is None:
         params = TurnerParams.turner2004()
     seq = _seq_from_str(seq_str)
+    seq_bytes = _seq_bytes(seq)
     target_struct = parse_dot_bracket(target_db)
-    fold_result = _fold_mfe(seq, params)
-    pred_struct = parse_dot_bracket(fold_result.mfe_structure)
-    mfe_kcal = fold_result.mfe_energy / 100.0
-    target_energy_int = _eval_energy(seq, target_struct, params)
+    mfe_energy, mfe_db = _fold_mfe(seq_bytes)
+    pred_struct = parse_dot_bracket(mfe_db)
+    mfe_kcal = mfe_energy / 100.0
+    target_energy_int = _eval_energy(seq_bytes, target_struct.pair_table)
     target_energy_kcal = target_energy_int / 100.0
     gap_kcal = target_energy_kcal - mfe_kcal
     dist = bp_distance(pred_struct, target_struct)
@@ -105,29 +110,30 @@ def verify_sequence(seq_str: str, target_db: str, params: Optional[TurnerParams]
     precision, recall, bp_f1 = bp_precision_recall_f1(pred_struct, target_struct)
     pos_match, pos_total = position_match(pred_struct, target_struct)
     pos_f1_val = position_f1(pred_struct, target_struct)
-    return VerificationReport(label=label, sequence=seq_str, target_db=target_db, predicted_db=fold_result.mfe_structure, mfe_kcal=mfe_kcal, target_energy_kcal=target_energy_kcal, gap_kcal=gap_kcal, bp_dist=dist, bp_tp=tp, bp_fp=fp, bp_fn=fn, bp_precision=precision, bp_recall=recall, bp_f1=bp_f1, pos_match=pos_match, pos_total=pos_total, pos_f1=pos_f1_val, matches_exactly=dist == 0)
+    return VerificationReport(label=label, sequence=seq_str, target_db=target_db, predicted_db=mfe_db, mfe_kcal=mfe_kcal, target_energy_kcal=target_energy_kcal, gap_kcal=gap_kcal, bp_dist=dist, bp_tp=tp, bp_fp=fp, bp_fn=fn, bp_precision=precision, bp_recall=recall, bp_f1=bp_f1, pos_match=pos_match, pos_total=pos_total, pos_f1=pos_f1_val, matches_exactly=dist == 0)
 
 def verify_against_both(seq_str: str, s_on_db: str, s_off_db: str, params: Optional[TurnerParams]=None) -> tuple[VerificationReport, VerificationReport]:
-    from ribo_switch.rust_bridge import fold_mfe as _fold_mfe
-    from ribo_switch.rust_bridge import eval_energy as _eval_energy
+    from ribo_rs import eval_energy as _eval_energy
+    from ribo_rs import fold_mfe as _fold_mfe
     if params is None:
         params = TurnerParams.turner2004()
     seq = _seq_from_str(seq_str)
+    seq_bytes = _seq_bytes(seq)
     s_on = parse_dot_bracket(s_on_db)
     s_off = parse_dot_bracket(s_off_db)
-    fold_result = _fold_mfe(seq, params)
-    pred_struct = parse_dot_bracket(fold_result.mfe_structure)
-    mfe_kcal = fold_result.mfe_energy / 100.0
+    mfe_energy, mfe_db = _fold_mfe(seq_bytes)
+    pred_struct = parse_dot_bracket(mfe_db)
+    mfe_kcal = mfe_energy / 100.0
 
     def _report(target: Structure, target_db: str, label: str) -> VerificationReport:
-        e_int = _eval_energy(seq, target, params)
+        e_int = _eval_energy(seq_bytes, target.pair_table)
         e_kcal = e_int / 100.0
         dist = bp_distance(pred_struct, target)
         tp, fp, fn = bp_confusion(pred_struct, target)
         precision, recall, bp_f1 = bp_precision_recall_f1(pred_struct, target)
         pos_match, pos_total = position_match(pred_struct, target)
         pos_f1_val = position_f1(pred_struct, target)
-        return VerificationReport(label=label, sequence=seq_str, target_db=target_db, predicted_db=fold_result.mfe_structure, mfe_kcal=mfe_kcal, target_energy_kcal=e_kcal, gap_kcal=e_kcal - mfe_kcal, bp_dist=dist, bp_tp=tp, bp_fp=fp, bp_fn=fn, bp_precision=precision, bp_recall=recall, bp_f1=bp_f1, pos_match=pos_match, pos_total=pos_total, pos_f1=pos_f1_val, matches_exactly=dist == 0)
+        return VerificationReport(label=label, sequence=seq_str, target_db=target_db, predicted_db=mfe_db, mfe_kcal=mfe_kcal, target_energy_kcal=e_kcal, gap_kcal=e_kcal - mfe_kcal, bp_dist=dist, bp_tp=tp, bp_fp=fp, bp_fn=fn, bp_precision=precision, bp_recall=recall, bp_f1=bp_f1, pos_match=pos_match, pos_total=pos_total, pos_f1=pos_f1_val, matches_exactly=dist == 0)
     report_on = _report(s_on, s_on_db, 'ON')
     report_off = _report(s_off, s_off_db, 'OFF')
     return (report_on, report_off)

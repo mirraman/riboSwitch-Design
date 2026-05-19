@@ -346,3 +346,83 @@ fn interior64(
     if is_au_gu(pp) { e += TERMINAL_AU_PENALTY; }
     e as i64
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tetraloop_energy_no_double_mismatch() {
+        // GCCUCCGGGC with structure ((........))
+        // CUCCGG is a special tetraloop with bonus 270
+        // Encoding: G=2, C=1, U=3
+        let _seq: Vec<u8> = vec![2, 1, 1, 3, 1, 1, 2, 2, 2, 1];
+        //                      G  C  C  U  C  C  G  G  G  C
+        //                      0  1  2  3  4  5  6  7  8  9
+        
+        // Hairpin from position 1 to 8 (C-G closing pair)
+        // Loop content: CUCCGG (positions 1..=8) → size = 8-1-1 = 6
+        // That's NOT a tetraloop (size != 4).
+        //
+        // For a real tetraloop test, we need size == 4.
+        // CCUCCGG: C(1) closing with G(8), loop = UCCG, size = 4
+        // The window seq[1..=6] = [1,3,1,1,2,2] = CUCCGG → bonus 270
+        //
+        // Use GCUCCGGC: G(0)-C(7), inner C(1)-G(6), hairpin at (1,6), size=4
+        // seq[1..=6] = [1,3,1,1,2,2] = CUCCGG
+        let seq2: Vec<u8> = vec![2, 1, 3, 1, 1, 2, 2, 1];
+        //                       G  C  U  C  C  G  G  C
+        //                       0  1  2  3  4  5  6  7
+        // Hairpin at (1, 6): closing pair C(1)-G(6), size = 6-1-1 = 4
+        // Window seq[1..=6] = [1,3,1,1,2,2] = CUCCGG → bonus 270
+        let pi = pair_index(seq2[1], seq2[6]).unwrap(); // C-G = 2
+        let energy = hairpin_e(&seq2, 1, 6, pi);
+        
+        // Should be exactly 270 (the tetraloop bonus)
+        // NOT 270 + mismatch
+        assert_eq!(energy, 270, 
+            "Tetraloop energy should be exactly 270, got {}", energy);
+    }
+    
+    #[test]
+    fn test_dp_matches_eval_energy() {
+        // After fixing eval_combined.rs, verify consistency
+        let seq: Vec<u8> = vec![2, 2, 2, 2, 0, 0, 0, 0, 1, 1, 1, 1];
+        //                      G  G  G  G  A  A  A  A  C  C  C  C
+        
+        let (dp_energy, pairs, _structure) = fold_mfe_full(&seq);
+        let eval_e = crate::energy::eval_energy(&seq, &pairs);
+        
+        assert_eq!(dp_energy, eval_e,
+            "DP energy ({}) should match eval_energy ({})", 
+            dp_energy, eval_e);
+    }
+
+    #[test]
+    fn test_gaaa_tetraloop_folds_correctly() {
+        // GGGGAAAACCCC should fold to ((((....))))
+        let seq: Vec<u8> = vec![2, 2, 2, 2, 0, 0, 0, 0, 1, 1, 1, 1];
+        let (mfe, _pairs, structure) = fold_mfe_full(&seq);
+        
+        assert_eq!(structure, "((((....))))");
+        // Energy should be reasonable (not double-counted)
+        assert!(mfe > -600, "MFE {} suspiciously low", mfe);
+    }
+
+    #[test]
+    fn test_dp_eval_parity_multiple_sequences() {
+        let sequences: Vec<Vec<u8>> = vec![
+            vec![2, 2, 2, 0, 0, 0, 1, 1, 1],           // GGGAAACCC
+            vec![2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1],   // GCGCGCGCGCGC
+            vec![0, 3, 1, 2, 0, 3, 1, 2, 0, 3, 1, 2, 0, 3, 1, 2], // AUCGAUCGAUCGAUCG
+            vec![1, 1, 1, 1, 2, 2, 2, 2, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2], // CCCCGGGGAAAACCCCGGGG
+        ];
+        
+        for seq in &sequences {
+            let (dp_e, pairs, db) = fold_mfe_full(seq);
+            let eval_e = crate::energy::eval_energy(seq, &pairs);
+            assert_eq!(dp_e, eval_e,
+                "DP ({}) != eval ({}) for structure {}", dp_e, eval_e, db);
+        }
+    }
+}

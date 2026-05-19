@@ -3,9 +3,14 @@ import math
 from dataclasses import dataclass
 from ribo_switch.types import Base, Sequence, Structure, CANONICAL_PAIRS
 from ribo_switch.graph import Component, ConstraintGraph
-from ribo_switch.rust_bridge import eval_energy
+from ribo_rs import eval_energy as _rs_eval_energy
 from ribo_switch.turner import TurnerParams
 _ALL_BASES = [Base.A, Base.C, Base.G, Base.U]
+
+
+def _seq_bytes(seq: Sequence) -> list[int]:
+    """Convert a Sequence to the raw byte list that ribo_rs expects."""
+    return [int(b) for b in seq.bases]
 
 def kT_at(T: float=37.0) -> float:
     return 0.1987204 * (T + 273.15)
@@ -57,6 +62,8 @@ class BRPFResult:
 def brpf(seq: Sequence, graph: ConstraintGraph, s_on: Structure, s_off: Structure, params: TurnerParams, T: float=37.0) -> BRPFResult:
     kT = kT_at(T)
     ref_bases = list(seq.bases)
+    on_pt = s_on.pair_table
+    off_pt = s_off.pair_table
     log_Z_on = 0.0
     log_Z_off = 0.0
     for component in graph.components:
@@ -67,9 +74,9 @@ def brpf(seq: Sequence, graph: ConstraintGraph, s_on: Structure, s_off: Structur
             mod_bases = list(ref_bases)
             for pos, base in assignment.items():
                 mod_bases[pos] = base
-            mod_seq = Sequence(bases=mod_bases)
-            e_on = eval_energy(mod_seq, s_on, params)
-            e_off = eval_energy(mod_seq, s_off, params)
+            seq_bytes = [int(b) for b in mod_bases]
+            e_on = _rs_eval_energy(seq_bytes, on_pt)
+            e_off = _rs_eval_energy(seq_bytes, off_pt)
             on_terms.append(-e_on / kT)
             off_terms.append(-e_off / kT)
         log_Z_on += _log_sum_exp(on_terms)
