@@ -1,5 +1,4 @@
 # Stage 1: Compile the Rust extension and produce a wheel.
-# Uses the full python:3.12 image (has gcc/dev headers) plus the Rust toolchain.
 FROM python:3.12 AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -11,31 +10,40 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 RUN pip install --no-cache-dir maturin
 
-# Copy only the Rust crate; avoids dragging the rest of the repo into this layer.
 WORKDIR /build/ribo_rs
 COPY ribo_rs/ .
 # maturin build --release produces a platform wheel in target/wheels/.
-# build_rust.sh uses `maturin develop --release` which installs into the active venv
-# directly — that install doesn't survive the stage boundary. Using `maturin build`
-# instead creates a portable wheel we can pip-install in the final stage.
+# (build_rust.sh uses `maturin develop` which installs into the active venv directly
+# and doesn't survive the stage boundary — `maturin build` is the right choice here.)
 RUN maturin build --release
 
 
 # Stage 2: Slim runtime image.
 FROM python:3.12-slim
 
+# Java JRE for VARNA headless renderer + font/harfbuzz libs it needs at runtime.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        default-jre-headless \
+        libharfbuzz0b \
+        fontconfig \
+        fonts-dejavu \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Install the compiled Rust extension from the wheel produced above.
-# Inter-stage COPY is unaffected by .dockerignore, so target/wheels/ is always fresh.
+# Rust extension wheel from builder stage.
 COPY --from=builder /build/ribo_rs/target/wheels/ /tmp/wheels/
 RUN pip install --no-cache-dir /tmp/wheels/ribo_rs-*.whl && rm -rf /tmp/wheels
 
-# Copy only the Python package source — deliberately excludes ribo_rs/ so the source
-# directory never shadows the site-packages install of ribo_rs above.
+# Python package (ribo_switch) + service and viz dependencies.
+# Deliberately excludes ribo_rs/ source so it never shadows the installed wheel above.
 COPY pyproject.toml README.md ./
 COPY ribo_switch/ ribo_switch/
-RUN pip install --no-cache-dir ".[service]"
+RUN pip install --no-cache-dir ".[service,viz]"
+
+# VARNA headless renderer JAR.
+COPY deps/VARNAv3-93.jar /app/deps/VARNAv3-93.jar
+ENV VARNA_JAR=/app/deps/VARNAv3-93.jar
 
 EXPOSE 8001
 CMD ["uvicorn", "ribo_switch.service:app", "--host", "0.0.0.0", "--port", "8001"]

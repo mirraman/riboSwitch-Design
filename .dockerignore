@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 *.pyd
 *.so
+# deps/ contains the VARNA JAR — do NOT exclude *.jar globally
 **/target/
 *.egg-info/
 dist/
